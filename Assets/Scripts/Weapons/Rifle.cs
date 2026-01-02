@@ -37,13 +37,13 @@ public class Rifle : Gun
         {
             target = cameraTransform.position + (cameraTransform.forward * gunData.fireRange);
         }
-
+        
         StartCoroutine(BulletFire(target, hit));
     }
 
     private IEnumerator BulletFire(Vector3 targetPosition, RaycastHit hit)
     {
-        var bulletTrail = Instantiate(gunData.bulletTrailPrefab, gunMuzzle.position, Quaternion.identity);
+        var bulletTrail = Instantiate(gunData.bulletTrailPrefab, gunMuzzle.position, Quaternion.LookRotation(targetPosition - gunMuzzle.position));
 
         while (bulletTrail && Vector3.Distance(bulletTrail.transform.position, targetPosition) > 0.1f)
         {
