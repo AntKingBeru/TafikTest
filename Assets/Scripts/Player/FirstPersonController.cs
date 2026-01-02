@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.Cinemachine;
 
 public class FirstPersonController : MonoBehaviour
 {
@@ -10,23 +11,26 @@ public class FirstPersonController : MonoBehaviour
     [Header("Jump Parameter")]
     [SerializeField] private float jumpForce = 5.0f;
     [SerializeField] private float gravity = 9.81f;
+
+    [Header("Camera Settings")]
+    public CinemachineCamera cinemachineCamera;
+    [SerializeField] private float mouseSensitivity = 2.0f, verticalRange = 80.0f, bobFrequency = 1.0f, bobAmplitude = 0.2f;
     
-    [Header("Look Sensitivity")]
-    [SerializeField] private float mouseSensitivity = 2.0f;
-    [SerializeField] private float verticalRange = 80.0f;
+    [Header("Recoil")]
+    private Vector3 _targetRecoil = Vector3.zero, _currentRecoil = Vector3.zero;
     
     // [Header("Footstep Sounds")]
     // [SerializeField] private AudioSource footstepSource;
     // [SerializeField] private AudioClip[] footstepSounds;
     // [SerializeField] private float walkStepInterval = 0.5f, sprintStepInterval = 0.3f, velocityThreshold = 2.0f;
     
-    [Header("Inputs Customization")]
-    [SerializeField] private string horizontalMoveInput = "Horizontal";
-    [SerializeField] private string verticalMoveInput = "Vertical";
-    [SerializeField] private string mouseXInput = "Mouse X";
-    [SerializeField] private string mouseYInput = "Mouse Y";
-    [SerializeField] private KeyCode sprintKey = KeyCode.LeftShift;
-    [SerializeField] private KeyCode jumpKey = KeyCode.Space;
+    // [Header("Inputs Customization")]
+    // [SerializeField] private string horizontalMoveInput = "Horizontal";
+    // [SerializeField] private string verticalMoveInput = "Vertical";
+    // [SerializeField] private string mouseXInput = "Mouse X";
+    // [SerializeField] private string mouseYInput = "Mouse Y";
+    // [SerializeField] private KeyCode sprintKey = KeyCode.LeftShift;
+    // [SerializeField] private KeyCode jumpKey = KeyCode.Space;
     
     [Header("Input Actions")]
     [SerializeField] private InputActionAsset playerControls;
@@ -35,7 +39,7 @@ public class FirstPersonController : MonoBehaviour
     private Vector2 _moveInput, _lookInput;
     private Vector3 _currentMovement = Vector3.zero;
     private CharacterController _characterController;
-    private Camera _mainCamera;
+    private CinemachineBasicMultiChannelPerlin _bobber;
     // private bool _isMoving;
     // private int _lastPlayedIndex = -1;
     private float _verticalRotation, _nextStepTime;
@@ -43,9 +47,10 @@ public class FirstPersonController : MonoBehaviour
     private void Awake()
     {
         _characterController = GetComponent<CharacterController>();
-        _mainCamera = Camera.main;
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+        
+        _bobber = cinemachineCamera.GetComponent<CinemachineBasicMultiChannelPerlin>();
         
         _moveAction = playerControls.FindActionMap("Player").FindAction("Move");
         _jumpAction = playerControls.FindActionMap("Player").FindAction("Jump");
@@ -82,14 +87,19 @@ public class FirstPersonController : MonoBehaviour
         // HandleFootsteps();
     }
 
+    private void LateUpdate()
+    {
+        CameraBob();
+    }
+
     private void HandleMovement()
     {
-        float speedMultiplier = _sprintAction.ReadValue<float>() > 0 ? sprintMultiplier : 1f;
+        var speedMultiplier = _sprintAction.ReadValue<float>() > 0 ? sprintMultiplier : 1f;
         
-        float verticalSpeed = _moveInput.y * walkSpeed * speedMultiplier;
-        float horizontalSpeed = _moveInput.x * walkSpeed * speedMultiplier;
+        var verticalSpeed = _moveInput.y * walkSpeed * speedMultiplier;
+        var horizontalSpeed = _moveInput.x * walkSpeed * speedMultiplier;
         
-        Vector3 horizontalMovement = new  Vector3(horizontalSpeed, 0, verticalSpeed);
+        var horizontalMovement = new  Vector3(horizontalSpeed, 0, verticalSpeed);
         horizontalMovement = transform.rotation * horizontalMovement;
 
         HandleGravityAndJumping();
@@ -121,12 +131,12 @@ public class FirstPersonController : MonoBehaviour
     
     private void HandleRotation()
     {
-        float mouseXRotation = _lookInput.x * mouseSensitivity;
+        var mouseXRotation = _lookInput.x * mouseSensitivity;
         transform.Rotate(0, mouseXRotation, 0);
         
         _verticalRotation -= _lookInput.y * mouseSensitivity;
         _verticalRotation = Mathf.Clamp(_verticalRotation, -verticalRange, verticalRange);
-        _mainCamera.transform.localRotation = Quaternion.Euler(_verticalRotation, 0, 0);
+        cinemachineCamera.transform.localRotation = Quaternion.Euler(_verticalRotation + _currentRecoil.y, _currentRecoil.x, 0);
     }
 
     // private void HandleFootsteps()
@@ -161,4 +171,36 @@ public class FirstPersonController : MonoBehaviour
     //     footstepSource.clip = footstepSounds[randomIndex];
     //     footstepSource.Play();
     // }
+
+    public void ApplyRecoil(GunData gunData)
+    {
+        var recoilX = Random.Range(-gunData.maxRecoil.x, gunData.maxRecoil.x) * gunData.recoilAmount;
+        var recoilY = Random.Range(-gunData.maxRecoil.y, gunData.maxRecoil.y) * gunData.recoilAmount;
+        
+        _targetRecoil = new Vector3(recoilX, recoilY, 0);
+        
+        _currentRecoil = Vector3.MoveTowards(_currentRecoil, _targetRecoil, Time.deltaTime * gunData.recoilSpeed);
+    }
+
+    public void ResetRecoil(GunData gunData)
+    {
+        _currentRecoil = Vector3.MoveTowards(_currentRecoil, Vector3.zero, Time.deltaTime * gunData.recoilSpeed);
+        _targetRecoil = Vector3.MoveTowards(_targetRecoil, Vector3.zero, Time.deltaTime * gunData.recoilSpeed);
+    }
+
+    private void CameraBob()
+    {
+        var speedMultiplier = _sprintAction.ReadValue<float>() > 0 ? sprintMultiplier : 1f;
+        
+        if (_characterController.isGrounded && _characterController.velocity.magnitude > 0.1f)
+        {
+            _bobber.FrequencyGain = bobFrequency * speedMultiplier;
+            _bobber.AmplitudeGain = bobAmplitude * speedMultiplier;
+        }
+        else
+        {
+            _bobber.FrequencyGain = 0;
+            _bobber.AmplitudeGain = 0;
+        }
+    }
 }

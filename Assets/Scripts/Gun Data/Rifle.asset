@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 85a9b2af9f140f24aafb5c4580c21583, type: 3}
+  m_Name: Rifle
+  m_EditorClassIdentifier: Assembly-CSharp::GunData
+  gunName: Rifle
+  targetLayerMask:
+    serializedVersion: 2
+    m_Bits: 64
+  fireRange: 100
+  fireRate: 4
+  magSize: 8
+  reloadTime: 2
+  maxRecoil: {x: 1, y: 2}
+  recoilAmount: 1
+  recoilSpeed: 30
+  recoilRecoveryTime: 4
+  bulletTrailPrefab: {fileID: 763003087040942353, guid: 5f42ec7481771c3469289857907889df, type: 3}
+  bulletSpeed: 100
