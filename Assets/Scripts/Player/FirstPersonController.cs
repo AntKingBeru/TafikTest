@@ -1,41 +1,43 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.Cinemachine;
 
 public class FirstPersonController : MonoBehaviour
 {
     [Header("Movement Speeds")]
-    [SerializeField] private float walkSpeed = 3.0f;
-    [SerializeField] private float sprintMultiplier = 2.0f;
+    [SerializeField] private float walkSpeed = 6.0f;
     
     [Header("Jump Parameter")]
     [SerializeField] private float jumpForce = 5.0f;
     [SerializeField] private float gravity = 9.81f;
+
+    [Header("Camera Settings")]
+    public CinemachineCamera cinemachineCamera;
+    [SerializeField] private float mouseSensitivity = 2.0f, verticalRange = 80.0f, bobFrequency = 1.0f, bobAmplitude = 0.2f;
     
-    [Header("Look Sensitivity")]
-    [SerializeField] private float mouseSensitivity = 2.0f;
-    [SerializeField] private float verticalRange = 80.0f;
+    [Header("Recoil")]
+    private Vector3 _targetRecoil = Vector3.zero, _currentRecoil = Vector3.zero;
     
     // [Header("Footstep Sounds")]
     // [SerializeField] private AudioSource footstepSource;
     // [SerializeField] private AudioClip[] footstepSounds;
-    // [SerializeField] private float walkStepInterval = 0.5f, sprintStepInterval = 0.3f, velocityThreshold = 2.0f;
+    // [SerializeField] private float walkStepInterval = 0.3f, velocityThreshold = 2.0f;
     
-    [Header("Inputs Customization")]
-    [SerializeField] private string horizontalMoveInput = "Horizontal";
-    [SerializeField] private string verticalMoveInput = "Vertical";
-    [SerializeField] private string mouseXInput = "Mouse X";
-    [SerializeField] private string mouseYInput = "Mouse Y";
-    [SerializeField] private KeyCode sprintKey = KeyCode.LeftShift;
-    [SerializeField] private KeyCode jumpKey = KeyCode.Space;
+    // [Header("Inputs Customization")]
+    // [SerializeField] private string horizontalMoveInput = "Horizontal";
+    // [SerializeField] private string verticalMoveInput = "Vertical";
+    // [SerializeField] private string mouseXInput = "Mouse X";
+    // [SerializeField] private string mouseYInput = "Mouse Y";
+    // [SerializeField] private KeyCode jumpKey = KeyCode.Space;
     
     [Header("Input Actions")]
     [SerializeField] private InputActionAsset playerControls;
 
-    private InputAction _moveAction, _jumpAction, _sprintAction, _lookAction;
+    private InputAction _moveAction, _jumpAction, _lookAction;
     private Vector2 _moveInput, _lookInput;
     private Vector3 _currentMovement = Vector3.zero;
     private CharacterController _characterController;
-    private Camera _mainCamera;
+    private CinemachineBasicMultiChannelPerlin _bobber;
     // private bool _isMoving;
     // private int _lastPlayedIndex = -1;
     private float _verticalRotation, _nextStepTime;
@@ -43,13 +45,13 @@ public class FirstPersonController : MonoBehaviour
     private void Awake()
     {
         _characterController = GetComponent<CharacterController>();
-        _mainCamera = Camera.main;
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
         
+        _bobber = cinemachineCamera.GetComponent<CinemachineBasicMultiChannelPerlin>();
+        
         _moveAction = playerControls.FindActionMap("Player").FindAction("Move");
         _jumpAction = playerControls.FindActionMap("Player").FindAction("Jump");
-        _sprintAction = playerControls.FindActionMap("Player").FindAction("Sprint");
         _lookAction = playerControls.FindActionMap("Player").FindAction("Look");
         
         _moveAction.performed += context => _moveInput = context.ReadValue<Vector2>();
@@ -63,7 +65,6 @@ public class FirstPersonController : MonoBehaviour
     {
         _moveAction.Enable();
         _jumpAction.Enable();
-        _sprintAction.Enable();
         _lookAction.Enable();
     }
 
@@ -71,7 +72,6 @@ public class FirstPersonController : MonoBehaviour
     {
         _moveAction.Disable();
         _jumpAction.Disable();
-        _sprintAction.Disable();
         _lookAction.Disable();
     }
 
@@ -82,14 +82,17 @@ public class FirstPersonController : MonoBehaviour
         // HandleFootsteps();
     }
 
+    private void LateUpdate()
+    {
+        CameraBob();
+    }
+
     private void HandleMovement()
     {
-        float speedMultiplier = _sprintAction.ReadValue<float>() > 0 ? sprintMultiplier : 1f;
+        var verticalSpeed = _moveInput.y * walkSpeed;
+        var horizontalSpeed = _moveInput.x * walkSpeed;
         
-        float verticalSpeed = _moveInput.y * walkSpeed * speedMultiplier;
-        float horizontalSpeed = _moveInput.x * walkSpeed * speedMultiplier;
-        
-        Vector3 horizontalMovement = new  Vector3(horizontalSpeed, 0, verticalSpeed);
+        var horizontalMovement = new  Vector3(horizontalSpeed, 0, verticalSpeed);
         horizontalMovement = transform.rotation * horizontalMovement;
 
         HandleGravityAndJumping();
@@ -121,23 +124,21 @@ public class FirstPersonController : MonoBehaviour
     
     private void HandleRotation()
     {
-        float mouseXRotation = _lookInput.x * mouseSensitivity;
+        var mouseXRotation = _lookInput.x * mouseSensitivity;
         transform.Rotate(0, mouseXRotation, 0);
         
         _verticalRotation -= _lookInput.y * mouseSensitivity;
         _verticalRotation = Mathf.Clamp(_verticalRotation, -verticalRange, verticalRange);
-        _mainCamera.transform.localRotation = Quaternion.Euler(_verticalRotation, 0, 0);
+        cinemachineCamera.transform.localRotation = Quaternion.Euler(_verticalRotation + _currentRecoil.y, _currentRecoil.x, 0);
     }
 
     // private void HandleFootsteps()
     // {
-    //     float currentStepInterval = (_sprintAction.ReadValue<float>() > 0 ? sprintStepInterval : walkStepInterval);
-    //
     //     if (_characterController.isGrounded && _isMoving && Time.time > _nextStepTime &&
     //         _characterController.velocity.magnitude > velocityThreshold)
     //     {
     //         PlayFootstepsSounds();
-    //         _nextStepTime = Time.time + currentStepInterval;
+    //         _nextStepTime = Time.time + walkStepInterval;
     //     }
     // }
     //
@@ -161,4 +162,34 @@ public class FirstPersonController : MonoBehaviour
     //     footstepSource.clip = footstepSounds[randomIndex];
     //     footstepSource.Play();
     // }
+
+    public void ApplyRecoil(GunData gunData)
+    {
+        var recoilX = Random.Range(-gunData.maxRecoil.x, gunData.maxRecoil.x) * gunData.recoilAmount;
+        var recoilY = Random.Range(-gunData.maxRecoil.y, gunData.maxRecoil.y) * gunData.recoilAmount;
+        
+        _targetRecoil = new Vector3(recoilX, recoilY, 0);
+        
+        _currentRecoil = Vector3.MoveTowards(_currentRecoil, _targetRecoil, Time.deltaTime * gunData.recoilSpeed);
+    }
+
+    public void ResetRecoil(GunData gunData)
+    {
+        _currentRecoil = Vector3.MoveTowards(_currentRecoil, Vector3.zero, Time.deltaTime * gunData.recoilSpeed);
+        _targetRecoil = Vector3.MoveTowards(_targetRecoil, Vector3.zero, Time.deltaTime * gunData.recoilSpeed);
+    }
+
+    private void CameraBob()
+    {
+        if (_characterController.isGrounded && _characterController.velocity.magnitude > 0.1f)
+        {
+            _bobber.FrequencyGain = bobFrequency;
+            _bobber.AmplitudeGain = bobAmplitude;
+        }
+        else
+        {
+            _bobber.FrequencyGain = 0;
+            _bobber.AmplitudeGain = 0;
+        }
+    }
 }
