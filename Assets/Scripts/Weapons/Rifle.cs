@@ -27,34 +27,38 @@ public class Rifle : Gun
     {
         RaycastHit hit;
         Vector3 target;
+        bool hasHit = false;
 
-        if (Physics.Raycast(cameraTransform.position, cameraTransform.forward, out hit, gunData.fireRange, gunData.targetLayerMask))
+        Ray hitRay = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+
+        if (Physics.Raycast(hitRay, out hit, gunData.fireRange, gunData.targetLayerMask))
         {
             Debug.Log(gunData.gunName + " hit" + hit.collider.name);
             target = hit.point;
+            hasHit = true;
         }
         else
         {
-            target = cameraTransform.position + (cameraTransform.forward * gunData.fireRange);
+            target = hitRay.origin + hitRay.direction * gunData.fireRange;
         }
         
-        StartCoroutine(BulletFire(target, hit));
+        StartCoroutine(BulletFire(target, hit, hasHit));
     }
 
-    private IEnumerator BulletFire(Vector3 targetPosition, RaycastHit hit)
+    private IEnumerator BulletFire(Vector3 targetPosition, RaycastHit hit, bool hasHit)
     {
         var bulletTrail = Instantiate(gunData.bulletTrailPrefab, gunMuzzle.position, Quaternion.LookRotation(targetPosition - gunMuzzle.position));
 
-        while (bulletTrail && Vector3.Distance(bulletTrail.transform.position, targetPosition) > 0.1f)
+        while (bulletTrail && Vector3.Distance(bulletTrail.transform.position, targetPosition) > 0.01f)
         {
             bulletTrail.transform.position = Vector3.MoveTowards(bulletTrail.transform.position, targetPosition,
                 Time.deltaTime * gunData.bulletSpeed);
             yield return null;
         }
         
-        Destroy(bulletTrail);
+        if (bulletTrail) Destroy(bulletTrail);
         
-        if (hit.collider) BulletHitFX(hit);
+        if (hasHit) BulletHitFX(hit);
     }
 
     private void BulletHitFX(RaycastHit hit)

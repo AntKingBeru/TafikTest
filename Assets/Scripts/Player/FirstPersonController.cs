@@ -5,8 +5,7 @@ using Unity.Cinemachine;
 public class FirstPersonController : MonoBehaviour
 {
     [Header("Movement Speeds")]
-    [SerializeField] private float walkSpeed = 3.0f;
-    [SerializeField] private float sprintMultiplier = 2.0f;
+    [SerializeField] private float walkSpeed = 6.0f;
     
     [Header("Jump Parameter")]
     [SerializeField] private float jumpForce = 5.0f;
@@ -22,20 +21,19 @@ public class FirstPersonController : MonoBehaviour
     // [Header("Footstep Sounds")]
     // [SerializeField] private AudioSource footstepSource;
     // [SerializeField] private AudioClip[] footstepSounds;
-    // [SerializeField] private float walkStepInterval = 0.5f, sprintStepInterval = 0.3f, velocityThreshold = 2.0f;
+    // [SerializeField] private float walkStepInterval = 0.3f, velocityThreshold = 2.0f;
     
     // [Header("Inputs Customization")]
     // [SerializeField] private string horizontalMoveInput = "Horizontal";
     // [SerializeField] private string verticalMoveInput = "Vertical";
     // [SerializeField] private string mouseXInput = "Mouse X";
     // [SerializeField] private string mouseYInput = "Mouse Y";
-    // [SerializeField] private KeyCode sprintKey = KeyCode.LeftShift;
     // [SerializeField] private KeyCode jumpKey = KeyCode.Space;
     
     [Header("Input Actions")]
     [SerializeField] private InputActionAsset playerControls;
 
-    private InputAction _moveAction, _jumpAction, _sprintAction, _lookAction;
+    private InputAction _moveAction, _jumpAction, _lookAction;
     private Vector2 _moveInput, _lookInput;
     private Vector3 _currentMovement = Vector3.zero;
     private CharacterController _characterController;
@@ -54,7 +52,6 @@ public class FirstPersonController : MonoBehaviour
         
         _moveAction = playerControls.FindActionMap("Player").FindAction("Move");
         _jumpAction = playerControls.FindActionMap("Player").FindAction("Jump");
-        _sprintAction = playerControls.FindActionMap("Player").FindAction("Sprint");
         _lookAction = playerControls.FindActionMap("Player").FindAction("Look");
         
         _moveAction.performed += context => _moveInput = context.ReadValue<Vector2>();
@@ -68,7 +65,6 @@ public class FirstPersonController : MonoBehaviour
     {
         _moveAction.Enable();
         _jumpAction.Enable();
-        _sprintAction.Enable();
         _lookAction.Enable();
     }
 
@@ -76,7 +72,6 @@ public class FirstPersonController : MonoBehaviour
     {
         _moveAction.Disable();
         _jumpAction.Disable();
-        _sprintAction.Disable();
         _lookAction.Disable();
     }
 
@@ -94,10 +89,8 @@ public class FirstPersonController : MonoBehaviour
 
     private void HandleMovement()
     {
-        var speedMultiplier = _sprintAction.ReadValue<float>() > 0 ? sprintMultiplier : 1f;
-        
-        var verticalSpeed = _moveInput.y * walkSpeed * speedMultiplier;
-        var horizontalSpeed = _moveInput.x * walkSpeed * speedMultiplier;
+        var verticalSpeed = _moveInput.y * walkSpeed;
+        var horizontalSpeed = _moveInput.x * walkSpeed;
         
         var horizontalMovement = new  Vector3(horizontalSpeed, 0, verticalSpeed);
         horizontalMovement = transform.rotation * horizontalMovement;
@@ -141,13 +134,11 @@ public class FirstPersonController : MonoBehaviour
 
     // private void HandleFootsteps()
     // {
-    //     float currentStepInterval = (_sprintAction.ReadValue<float>() > 0 ? sprintStepInterval : walkStepInterval);
-    //
     //     if (_characterController.isGrounded && _isMoving && Time.time > _nextStepTime &&
     //         _characterController.velocity.magnitude > velocityThreshold)
     //     {
     //         PlayFootstepsSounds();
-    //         _nextStepTime = Time.time + currentStepInterval;
+    //         _nextStepTime = Time.time + walkStepInterval;
     //     }
     // }
     //
@@ -190,12 +181,10 @@ public class FirstPersonController : MonoBehaviour
 
     private void CameraBob()
     {
-        var speedMultiplier = _sprintAction.ReadValue<float>() > 0 ? sprintMultiplier : 1f;
-        
         if (_characterController.isGrounded && _characterController.velocity.magnitude > 0.1f)
         {
-            _bobber.FrequencyGain = bobFrequency * speedMultiplier;
-            _bobber.AmplitudeGain = bobAmplitude * speedMultiplier;
+            _bobber.FrequencyGain = bobFrequency;
+            _bobber.AmplitudeGain = bobAmplitude;
         }
         else
         {
