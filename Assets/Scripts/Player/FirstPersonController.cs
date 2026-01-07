@@ -32,8 +32,7 @@ public class FirstPersonController : MonoBehaviour
     
     [Header("Input Actions")]
     [SerializeField] private InputActionAsset playerControls;
-
-    private InputAction _moveAction, _jumpAction, _lookAction;
+    [SerializeField] private InputActionReference moveAction, jumpAction, lookAction;
     private Vector2 _moveInput, _lookInput;
     private Vector3 _currentMovement = Vector3.zero;
     private CharacterController _characterController;
@@ -50,29 +49,25 @@ public class FirstPersonController : MonoBehaviour
         
         _bobber = cinemachineCamera.GetComponent<CinemachineBasicMultiChannelPerlin>();
         
-        _moveAction = playerControls.FindActionMap("Player").FindAction("Move");
-        _jumpAction = playerControls.FindActionMap("Player").FindAction("Jump");
-        _lookAction = playerControls.FindActionMap("Player").FindAction("Look");
+        moveAction.action.performed += context => _moveInput = context.ReadValue<Vector2>();
+        moveAction.action.canceled += context => _moveInput = Vector2.zero;
         
-        _moveAction.performed += context => _moveInput = context.ReadValue<Vector2>();
-        _moveAction.canceled += context => _moveInput = Vector2.zero;
-        
-        _lookAction.performed += context => _lookInput = context.ReadValue<Vector2>();
-        _lookAction.canceled += context => _lookInput = Vector2.zero;
+        lookAction.action.performed += context => _lookInput = context.ReadValue<Vector2>();
+        lookAction.action.canceled += context => _lookInput = Vector2.zero;
     }
 
     private void OnEnable()
     {
-        _moveAction.Enable();
-        _jumpAction.Enable();
-        _lookAction.Enable();
+        moveAction.action.Enable();
+        jumpAction.action.Enable();
+        lookAction.action.Enable();
     }
 
     private void OnDisable()
     {
-        _moveAction.Disable();
-        _jumpAction.Disable();
-        _lookAction.Disable();
+        moveAction.action.Disable();
+        jumpAction.action.Disable();
+        lookAction.action.Disable();
     }
 
     private void Update()
@@ -111,7 +106,7 @@ public class FirstPersonController : MonoBehaviour
         {
             _currentMovement.y = -0.5f;
 
-            if (_jumpAction.triggered)
+            if (jumpAction.action.triggered)
             {
                 _currentMovement.y = jumpForce;
             }
